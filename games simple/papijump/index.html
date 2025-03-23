@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Papi Jump</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            border: 2px solid #333;
+            overflow: hidden;
+            background-color: #c5e6ef;
+        }
+        
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #ff3333;
+            border-radius: 50%;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .platform {
+            position: absolute;
+            width: 70px;
+            height: 15px;
+            background-color: #5a5a5a;
+            border-radius: 8px;
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            color: #333;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            display: none;
+        }
+        
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .eye {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: black;
+            border-radius: 50%;
+            top: 12px;
+        }
+        
+        .eye.left {
+            left: 10px;
+        }
+        
+        .eye.right {
+            right: 10px;
+        }
+        
+        .mouth {
+            position: absolute;
+            width: 20px;
+            height: 6px;
+            background-color: black;
+            border-radius: 0 0 10px 10px;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="player">
+            <div class="face">
+                <div class="eye left"></div>
+                <div class="eye right"></div>
+                <div class="mouth"></div>
+            </div>
+        </div>
+        <div id="score-display">Score: 0</div>
+        <div id="game-over">
+            <h2>Game Over!</h2>
+            <p>Your score: <span id="final-score">0</span></p>
+            <button id="restart-button">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const player = document.getElementById('player');
+        const gameContainer = document.getElementById('game-container');
+        const scoreDisplay = document.getElementById('score-display');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartButton = document.getElementById('restart-button');
+        
+        let platforms = [];
+        let score = 0;
+        let highestPoint = 0;
+        let playerX = 200;
+        let playerY = 300;
+        let velocityX = 0;
+        let velocityY = 0;
+        let gravity = 0.3;
+        let isJumping = false;
+        let isGameOver = false;
+        let gameStarted = false;
+        
+        // Platform generation
+        function createPlatform(x, y) {
+            const platform = document.createElement('div');
+            platform.className = 'platform';
+            platform.style.left = x + 'px';
+            platform.style.bottom = y + 'px';
+            gameContainer.appendChild(platform);
+            platforms.push({
+                element: platform,
+                x: x,
+                y: y,
+                width: 70,
+                height: 15
+            });
+        }
+        
+        // Initialize game
+        function initGame() {
+            isGameOver = false;
+            gameStarted = true;
+            platforms = [];
+            score = 0;
+            highestPoint = 0;
+            playerX = 200;
+            playerY = 100;
+            velocityX = 0;
+            velocityY = 0;
+            
+            // Clear existing platforms
+            const existingPlatforms = document.querySelectorAll('.platform');
+            existingPlatforms.forEach(platform => platform.remove());
+            
+            // Hide game over screen
+            gameOverScreen.style.display = 'none';
+            
+            // Create initial platforms
+            createPlatform(185, 50); // Starting platform
+            
+            // Generate random platforms
+            for (let i = 0; i < 10; i++) {
+                createPlatform(
+                    Math.random() * (gameContainer.offsetWidth - 70),
+                    150 + i * 80
+                );
+            }
+            
+            // Update score display
+            updateScore(0);
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Game loop
+        function gameLoop() {
+            if (isGameOver) return;
+            
+            // Apply gravity
+            velocityY -= gravity;
+            
+            // Update player position
+            playerX += velocityX;
+            playerY += velocityY;
+            
+            // Implement screen wrap-around
+            if (playerX < -player.offsetWidth) {
+                // Wrap from left to right
+                playerX = gameContainer.offsetWidth;
+            } else if (playerX > gameContainer.offsetWidth) {
+                // Wrap from right to left
+                playerX = -player.offsetWidth + 5;
+            }
+            
+            // Check if player fell
+            if (playerY < -50) {
+                gameOver();
+                return;
+            }
+            
+            // Scroll the screen when player goes above half the screen
+            if (playerY > 300) {
+                const diff = playerY - 300;
+                playerY = 300;
+                
+                // Move platforms down
+                platforms.forEach(platform => {
+                    platform.y -= diff;
+                    platform.element.style.bottom = platform.y + 'px';
+                    
+                    // Remove platforms that are out of view
+                    if (platform.y < -20) {
+                        platform.element.remove();
+                    }
+                });
+                
+                // Add to score based on how high the player went
+                highestPoint += diff;
+                updateScore(Math.floor(highestPoint / 10));
+                
+                // Generate new platforms
+                while (platforms.length < 7) {
+                    createPlatform(
+                        Math.random() * (gameContainer.offsetWidth - 70),
+                        platforms[platforms.length - 1].y + 100 + Math.random() * 50
+                    );
+                }
+                
+                // Remove platforms that are out of view
+                platforms = platforms.filter(platform => platform.y >= -20);
+            }
+            
+            // Check platform collisions
+            if (velocityY < 0) {
+                for (let i = 0; i < platforms.length; i++) {
+                    const platform = platforms[i];
+                    if (
+                        playerY >= platform.y &&
+                        playerY <= platform.y + platform.height + 10 &&
+                        playerX + player.offsetWidth >= platform.x &&
+                        playerX <= platform.x + platform.width &&
+                        velocityY < 0
+                    ) {
+                        velocityY = 9; // Jump - reduced for slower bounce
+                        break;
+                    }
+                }
+            }
+            
+            // Update player position on screen
+            player.style.left = playerX + 'px';
+            player.style.bottom = playerY + 'px';
+            
+            // Continue game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Update score display
+        function updateScore(newScore) {
+            score = newScore;
+            scoreDisplay.innerText = 'Score: ' + score;
+        }
+        
+        // Game over
+        function gameOver() {
+            isGameOver = true;
+            finalScoreDisplay.innerText = score;
+            gameOverScreen.style.display = 'flex';
+        }
+        
+        // Handle keyboard input
+        window.addEventListener('keydown', (e) => {
+            if (!gameStarted) {
+                initGame();
+                return;
+            }
+            
+            if (e.key === 'ArrowLeft' || e.key === 'a') {
+                velocityX = -5;
+            } else if (e.key === 'ArrowRight' || e.key === 'd') {
+                velocityX = 5;
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if ((e.key === 'ArrowLeft' || e.key === 'a') && velocityX < 0) {
+                velocityX = 0;
+            } else if ((e.key === 'ArrowRight' || e.key === 'd') && velocityX > 0) {
+                velocityX = 0;
+            }
+        });
+        
+        // Handle touch input for mobile
+        let touchStartX = 0;
+        gameContainer.addEventListener('touchstart', (e) => {
+            if (!gameStarted) {
+                initGame();
+                return;
+            }
+            
+            touchStartX = e.touches[0].clientX;
+        });
+        
+        gameContainer.addEventListener('touchmove', (e) => {
+            if (!gameStarted || isGameOver) return;
+            
+            const touchX = e.touches[0].clientX;
+            const diff = touchX - touchStartX;
+            
+            if (diff > 10) {
+                velocityX = 5;
+            } else if (diff < -10) {
+                velocityX = -5;
+            }
+            
+            e.preventDefault();
+        });
+        
+        gameContainer.addEventListener('touchend', () => {
+            velocityX = 0;
+        });
+        
+        // Restart game
+        restartButton.addEventListener('click', initGame);
+        
+        // Initialize the game on page load
+        window.addEventListener('load', () => {
+            // Display instructions before starting
+            createPlatform(185, 50); // Starting platform
+            player.style.left = '200px';
+            player.style.bottom = '100px';
+            
+            // Show instruction text
+            const instructions = document.createElement('div');
+            instructions.style.position = 'absolute';
+            instructions.style.top = '50%';
+            instructions.style.left = '50%';
+            instructions.style.transform = 'translate(-50%, -50%)';
+            instructions.style.textAlign = 'center';
+            instructions.style.color = '#333';
+            instructions.innerHTML = '<h2>Papi Jump</h2>' +
+                                    '<p>Press any key to start</p>' +
+                                    '<p>Use arrow keys or A/D to move</p>';
+            gameContainer.appendChild(instructions);
+            
+            // Start game on key press
+            window.addEventListener('keydown', function startGame(e) {
+                initGame();
+                instructions.remove();
+                window.removeEventListener('keydown', startGame);
+            }, { once: true });
+            
+            // Start game on touch for mobile
+            window.addEventListener('touchstart', function startGameTouch() {
+                initGame();
+                instructions.remove();
+                window.removeEventListener('touchstart', startGameTouch);
+            }, { once: true });
+        });
+    </script>
+</body>
+</html>
